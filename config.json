@@ -1,0 +1,15 @@
+{
+  "rules": {
+    "require-tags": true,
+    "security-no-eval": true,
+    "security-no-shell-exec": true,
+    "style-no-die-exit": true,
+    "undefined-function": true
+  },
+  "paths": ["/Users/lukasolsen/repos/newsroom-publisher-modules"],
+  "excludes": [
+    "/Users/lukasolsen/repos/newsroom-publisher-modules/node_modules",
+    "/Users/lukasolsen/repos/newsroom-publisher-modules/vendor"
+  ],
+  "php_version": "8.0"
+}
