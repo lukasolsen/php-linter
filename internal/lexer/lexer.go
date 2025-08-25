@@ -73,6 +73,22 @@ func (l *Lexer) NextToken() token.Token {
 		tok = l.newToken(token.LPAREN, "(")
 	case ')':
 		tok = l.newToken(token.RPAREN, ")")
+	case '{':
+		tok = l.newToken(token.LBRACE, "{")
+	case ',':
+		tok = l.newToken(token.COMMA, ",")
+	case '"':
+		tok = l.newToken(token.STRING, l.readString())
+	case '}':
+		tok = l.newToken(token.RBRACE, "}")
+	case '/':
+		if l.peekChar() == '*' {
+			l.readChar()
+			tok = l.newToken(token.BLOCK_COMMENT, l.readBlockComment())
+		} else if l.peekChar() == '/' {
+			l.readChar()
+			tok = l.newToken(token.LINE_COMMENT, l.readLineComment())
+		}
 	case ';':
 		tok = l.newToken(token.SEMICOLON, ";")
 	case '\'':
@@ -131,4 +147,29 @@ func isDigit(ch rune) bool {
 func (l *Lexer) newToken(kind token.Kind, lexeme string) token.Token {
 	// Note: Span calculation can be improved for multi-char tokens
 	return token.Token{Kind: kind, Lexeme: lexeme}
+}
+
+func (l *Lexer) readBlockComment() string {
+	var sb strings.Builder
+	l.readChar() // Consume opening /*
+	for l.ch != 0 {
+		if l.ch == '*' && l.peekChar() == '/' {
+			l.readChar() // Consume *
+			l.readChar() // Consume /
+			break
+		}
+		sb.WriteRune(l.ch)
+		l.readChar()
+	}
+	return sb.String()
+}
+
+func (l *Lexer) readLineComment() string {
+	var sb strings.Builder
+	l.readChar() 
+	for l.ch != 0 && l.ch != '\n' {
+		sb.WriteRune(l.ch)
+		l.readChar()
+	}
+	return sb.String()
 }

@@ -2,6 +2,7 @@ package rules
 
 import (
 	"github.com/codevault-llc/php-lint/internal/ast"
+	"github.com/codevault-llc/php-lint/internal/stubs"
 	"github.com/codevault-llc/php-lint/internal/token"
 	"github.com/codevault-llc/php-lint/pkg/types"
 )
@@ -12,7 +13,7 @@ func (r *RuleNoShellExec) Name() string { return "security-no-shell-exec" }
 
 func (r *RuleNoShellExec) Description() string { return "Disallows the use of shell_exec() and similar functions." }
 
-func (r *RuleNoShellExec) Check(filename string, content []byte, program *ast.Program) []types.Issue {
+func (r *RuleNoShellExec) Check(filename string, content []byte, program *ast.Program, symbolTable *stubs.SymbolTable) []types.Issue {
 	visitor := &callExprVisitor{
 		ruleName: r.Name(),
 		check: func(node *ast.CallExpr) (bool, string) {

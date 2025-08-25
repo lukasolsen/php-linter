@@ -42,9 +42,13 @@ const (
 	COMMA     = ","
 	RBRACE    = "}"
 	LBRACE    = "{"
+	SLASH     = "/"
 
 	// Misc
 	WHITESPACE = "WHITESPACE"
+	COMMENT    = "COMMENT"
+	LINE_COMMENT = "LINE_COMMENT"
+	BLOCK_COMMENT = "BLOCK_COMMENT"
 
 	// PHP Tags
 	OPEN_TAG  = "<?php"

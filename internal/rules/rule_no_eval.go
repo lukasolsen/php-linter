@@ -2,6 +2,7 @@ package rules
 
 import (
 	"github.com/codevault-llc/php-lint/internal/ast"
+	"github.com/codevault-llc/php-lint/internal/stubs"
 	"github.com/codevault-llc/php-lint/internal/token"
 	"github.com/codevault-llc/php-lint/pkg/types"
 )
@@ -12,7 +13,7 @@ func (r *RuleNoEval) Name() string { return "security-no-eval" }
 
 func (r *RuleNoEval) Description() string { return "Disallows the use of the eval() function." }
 
-func (r *RuleNoEval) Check(filename string, content []byte, program *ast.Program) []types.Issue {
+func (r *RuleNoEval) Check(filename string, content []byte, program *ast.Program, symbolTable *stubs.SymbolTable) []types.Issue {
 	visitor := &callExprVisitor{
 		issues:   []types.Issue{},
 		ruleName: r.Name(),

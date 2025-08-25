@@ -31,7 +31,8 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.EXEC, p.parseIdentifier)
 	p.registerPrefix(token.PASSTHRU, p.parseIdentifier)
 	p.registerPrefix(token.SYSTEM, p.parseIdentifier)
-	p.registerPrefix(token.FUNCTION, p.parseFunctionDeclaration)
+	p.registerPrefix(token.ECHO, p.parseIdentifier)
+	p.registerPrefix(token.OPEN_TAG, func() ast.Expr { return nil })
 
 	p.infixParseFns = make(map[token.Kind]infixParseFn)
 	p.registerInfix(token.LPAREN, p.parseCallExpression)
@@ -55,6 +56,14 @@ func (p *Parser) nextToken() {
 	p.peekTok = p.l.NextToken()
 }
 
+func (p *Parser) expectPeek(t token.Kind) bool {
+	if p.peekTok.Kind == t {
+		p.nextToken()
+		return true
+	}
+	return false
+}
+
 func (p *Parser) ParseProgram() *ast.Program {
 	program := &ast.Program{Stmts: []ast.Stmt{}}
 	if p.curTok.Kind != token.OPEN_TAG {
@@ -67,26 +76,25 @@ func (p *Parser) ParseProgram() *ast.Program {
 		stmt := p.parseStatement()
 		if stmt != nil {
 			program.Stmts = append(program.Stmts, stmt)
+			// Ensure we advance the token stream after parsing a statement.
+			// Some parse functions may not consume tokens fully, so explicitly move to the next token
+			// to avoid an infinite loop that grows the statements slice without bound.
+			p.nextToken()
 		}
-	
-		p.nextToken()
 	}
 
 	return program
 }
 
 func (p *Parser) parseStatement() ast.Stmt {
+	var stmt ast.Stmt
 	switch p.curTok.Kind {
-	case token.FUNCTION:
-		if expr := p.parseExpression(); expr != nil {
-			if stmt, ok := expr.(ast.Stmt); ok {
-				return stmt
-			}
-		}
+	/*case token.FUNCTION:
+		stmt = p.parseFunctionDeclaration()*/
 	default:
-		return p.parseExpressionStatement()
+		stmt = p.parseExpressionStatement()
 	}
-	return nil
+	return stmt
 }
 
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
@@ -144,20 +152,44 @@ func (p *Parser) parseCallArguments() []ast.Expr {
 	return args
 }
 
+/*
 func (p *Parser) parseFunctionDeclaration() ast.Expr {
 	stmt := &ast.FunctionDeclStmt{Token: p.curTok}
 
-	if p.peekTok.Kind != token.IDENT {
-		return nil // Invalid function declaration
+	// Expect the function name (an identifier)
+	if !p.expectPeek(token.IDENT) {
+		return nil // Not a valid function declaration
 	}
-	p.nextToken()
 	stmt.Name = &ast.Identifier{Token: p.curTok, Value: p.curTok.Lexeme}
-	
-    // We don't need to parse the body `() {}` for stubs, 
-    // just skip until the next statement for performance.
-	for p.curTok.Kind != token.SEMICOLON && p.curTok.Kind != token.RBRACE && p.curTok.Kind != token.EOF {
+
+	// Expect the opening parenthesis for arguments
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+
+	// For now, we just skip over the arguments until we find the closing parenthesis.
+	// A more advanced parser would parse each argument here.
+	for p.curTok.Kind != token.RPAREN && p.curTok.Kind != token.EOF {
 		p.nextToken()
+	}
+
+	// Expect the opening curly brace for the function body
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	// Smartly skip the function body by tracking the nesting of curly braces.
+	// This prevents the parser from stopping on a '}' inside a nested block.
+	braceDepth := 1
+	for braceDepth > 0 && p.curTok.Kind != token.EOF {
+		p.nextToken()
+		if p.curTok.Kind == token.LBRACE {
+			braceDepth++
+		}
+		if p.curTok.Kind == token.RBRACE {
+			braceDepth--
+		}
 	}
 	
 	return stmt
-}
+}*/

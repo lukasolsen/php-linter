@@ -2,6 +2,7 @@ package rules
 
 import (
 	"github.com/codevault-llc/php-lint/internal/ast"
+	"github.com/codevault-llc/php-lint/internal/stubs"
 	"github.com/codevault-llc/php-lint/pkg/types"
 )
 
@@ -10,7 +11,7 @@ import (
 type Rule interface {
 	Name() string
 	Description() string
-	Check(filename string, content []byte, program *ast.Program) []types.Issue
+	Check(filename string, content []byte, program *ast.Program, symbolTable *stubs.SymbolTable) []types.Issue
 }
 
 var registry = make(map[string]Rule)

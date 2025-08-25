@@ -7,7 +7,6 @@ import (
 
 	"github.com/codevault-llc/php-lint/internal/linter"
 	"github.com/codevault-llc/php-lint/internal/reporter"
-	"github.com/codevault-llc/php-lint/pkg/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -23,15 +22,10 @@ func main() {
 
 	paths := l.Config().Paths
 	if len(os.Args) > 1 {
-		if os.Args[1] == "--lsp" {
-			log.Info().Msg("LSP mode is not implemented in this example")
-			return
-		}
 		if os.Args[1] == "--help" || os.Args[1] == "-h" {
 			fmt.Println("Usage: php-lint [options] [paths...]")
 			fmt.Println("Options:")
 			fmt.Println("  --help, -h       Show this help message")
-			fmt.Println("  --lsp            Run in LSP mode (not implemented)")
 			return
 		}
 
@@ -60,10 +54,7 @@ func main() {
 		}
 	}
 
-	results := make(map[string][]types.Issue)
-	for filename, content := range filesToLint {
-		results[filename] = l.Lint(filename, content)
-	}
+	results := l.LintProject(filesToLint)
 
 	reporter.Render(results)
 }
