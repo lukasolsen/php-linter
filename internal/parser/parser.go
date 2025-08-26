@@ -1,8 +1,6 @@
 package parser
 
 import (
-	"log"
-
 	"github.com/codevault-llc/php-lint/internal/ast"
 	"github.com/codevault-llc/php-lint/internal/lexer"
 	"github.com/codevault-llc/php-lint/internal/token"
@@ -94,11 +92,7 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	stmt := &ast.ExpressionStatement{Token: p.curTok}
 	stmt.Expression = p.parseExpression()
 
-	log.Print("Parsed expression:", stmt.Expression)
-
 	if p.peekTok.Kind == token.SEMICOLON {
-		log.Print("Found semicolon:", p.peekTok)
-
 		p.nextToken()
 	}
 	return stmt

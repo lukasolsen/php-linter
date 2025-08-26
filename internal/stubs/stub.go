@@ -1,7 +1,6 @@
 package stubs
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/codevault-llc/php-lint/internal/ast"
@@ -26,7 +25,6 @@ func (st *SymbolTable) IsFunctionDefined(name string) bool {
 }
 
 func (st *SymbolTable) AddSymbolsFromAST(program *ast.Program) {
-	fmt.Println("Adding symbols from AST")
 	for _, stmt := range program.Stmts {
 		if funcDecl, ok := stmt.(*ast.FunctionDeclStmt); ok {
 			log.Println("Found function declaration:", funcDecl.Name.Value)

@@ -23,7 +23,7 @@ func (r *RuleUndefinedFunction) Check(filename string, content []byte, program *
 		check: func(node *ast.CallExpr) (*types.Issue, bool) {
 			if ident, ok := node.Function.(*ast.Identifier); ok {
 				if !symbolTable.IsFunctionDefined(ident.Value) {
-					log.Printf("Undefined function %s() called", ident.Token)
+					log.Printf("Undefined function %s() called", ident.Token.Lexeme)
 
 					issue := types.Issue{
 						RuleName: r.Name(),

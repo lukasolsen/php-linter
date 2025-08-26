@@ -43,7 +43,7 @@ func (w *Workspace) Build() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	w.logger.Info().Str("path", w.rootDir).Msg("Building initial workspace cache...")
+	w.logger.Info().Str("path", w.rootDir).Msg("Building initial workspace cache")
 	startTime := time.Now()
 
 	filepath.Walk(w.rootDir, func(path string, info os.FileInfo, err error) error {

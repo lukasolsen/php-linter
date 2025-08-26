@@ -1,0 +1,5 @@
+{"level":"debug","stubs":[],"time":"2025-08-26T19:35:22+02:00","message":"Parsing stubs to build symbol table"}
+{"level":"debug","functions":0,"time":"2025-08-26T19:35:22+02:00","message":"Symbol table built"}
+{"level":"warn","rule":"require-tags","time":"2025-08-26T19:35:22+02:00","message":"Configured rule not found in registry"}
+{"level":"warn","rule":"style-no-die-exit","time":"2025-08-26T19:35:22+02:00","message":"Configured rule not found in registry"}
+{"level":"info","count":3,"time":"2025-08-26T19:35:22+02:00","message":"Active rules loaded"}

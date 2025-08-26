@@ -3,10 +3,12 @@ package main
 import (
 	"log"
 	"net/url"
+	"os"
 
 	"github.com/codevault-llc/php-lint/internal/linter"
 	"github.com/codevault-llc/php-lint/internal/stubs"
 	"github.com/codevault-llc/php-lint/internal/workspace"
+	"github.com/rs/zerolog"
 	"github.com/tliron/commonlog"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -22,13 +24,18 @@ var handler protocol.Handler
 var linterInstance *linter.Linter
 var workspaceInstance *workspace.Workspace
 var serverLogger commonlog.Logger
+var logger zerolog.Logger
 
 func main() {
 	commonlog.Configure(1, nil)
 	serverLogger = commonlog.GetLogger("php-linter")
 
+	var logger zerolog.Logger
 	var err error
-	linterInstance, err = linter.New("config.json", serverLogger)
+
+	logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
+
+	linterInstance, err = linter.New("config.json", logger)
 	if err != nil {
 		serverLogger.Criticalf("Failed to create linter: %v", err)
 	}
@@ -48,13 +55,14 @@ func main() {
 
 func onInitialize(context *glsp.Context, params *protocol.InitializeParams) (any, error) {
 	if params.RootURI != nil {
+		logger.Info().Msg("LSP server initialized")
 		uri, err := url.Parse(*params.RootURI)
 		if err == nil {
 			stubsTable := stubs.NewSymbolTable()
 			// You would parse configured stubs here and pass them to the workspace
 			// stubsTable.AddFromPath("/path/to/wordpress-stubs")
 
-			workspaceInstance = workspace.New(uri.Path, stubsTable, serverLogger)
+			workspaceInstance = workspace.New(uri.Path, stubsTable, logger)
 			
 			go workspaceInstance.Build()
 		}
@@ -124,17 +132,17 @@ func lintDocument(ctx *glsp.Context, uri string, text []byte) error {
 
 	diagnostics := []protocol.Diagnostic{}
 	for _, issue := range issues {
-		positionLine := protocol.UInteger(issue.Pos.Line - 1)
-		positionColumn := protocol.UInteger(issue.Pos.Col - 1)
+		positionLine := protocol.UInteger(issue.Range.Start.Line - 1)
+		positionColumn := protocol.UInteger(issue.Range.Start.Col - 1)
 
 		diagnostics = append(diagnostics, protocol.Diagnostic{
 			Range: protocol.Range{
 				Start: protocol.Position{Line: positionLine, Character: positionColumn},
 				End:   protocol.Position{Line: positionLine, Character: positionColumn},
 			},
-			Severity:  issue.Severity,
+			Severity:  &issue.Severity,
 			Message:   issue.Message,
-			Source:    issue.Source,
+			Source:    &issue.Source,
 			CodeDescription: &protocol.CodeDescription{
 				HRef: "https://example.com/rules/line-length",
 			},
@@ -148,19 +156,6 @@ func lintDocument(ctx *glsp.Context, uri string, text []byte) error {
 	})
 
 	return nil
-}
-
-func splitLines(text string) []string {
-	var lines []string
-	start := 0
-	for i, r := range text {
-		if r == '\n' {
-			lines = append(lines, text[start:i])
-			start = i + 1
-		}
-	}
-	lines = append(lines, text[start:])
-	return lines
 }
 
 func setTrace(context *glsp.Context, params *protocol.SetTraceParams) error {

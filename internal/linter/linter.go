@@ -25,8 +25,7 @@ type Linter struct {
 func New(configPath string, logger zerolog.Logger) (*Linter, error) {
 	cfg := config.New()
 	if cfg == nil {
-		logger.Fatal().Msg("Failed to create default config")
-		cfg.Defaults()
+		logger.Error().Msg("Failed to create default config")
 	}
 
 	// Parse stubs

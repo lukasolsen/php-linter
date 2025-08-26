@@ -19,7 +19,8 @@ type Config struct {
 func New() *Config {
 	cfg, err := loadAndMergeConfig("config.json")
 	if err != nil {
-		return nil
+		cfg = &Config{}
+		cfg.Defaults()
 	}
 
 	phpVersion := cfg.PHPVersion
@@ -50,7 +51,7 @@ func (cfg *Config) Defaults() {
 		}
 	}
 	if len(cfg.Stubs) == 0 {
-		cfg.Stubs = []string{"stubs/"}
+		cfg.Stubs = []string{}
 	}
 }
 

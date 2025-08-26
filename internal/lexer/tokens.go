@@ -58,11 +58,11 @@ func (l *Lexer) NextToken() token.Token {
 		tok = l.newTokenFromPos(token.EOF, "", startPos)
 	default:
 		if isLetter(l.ch) {
-			tok = l.newTokenFromPos(token.LookupIdent(l.readIdentifier()), l.readIdentifier(), startPos)
-			
-			log.Println("Found identifier:", tok.Kind)
-			return tok
-		} else {
+    ident := l.readIdentifier()
+    tok = l.newTokenFromPos(token.LookupIdent(ident), ident, startPos)
+    
+		return tok
+	} else {
 			log.Println("Illegal character listed !!", string(l.ch))
 			tok = l.newTokenFromPos(token.ILLEGAL, string(l.ch), startPos)
 		}
