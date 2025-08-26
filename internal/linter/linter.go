@@ -2,12 +2,9 @@ package linter
 
 import (
 	"embed"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/codevault-llc/php-lint/internal/ast"
 	"github.com/codevault-llc/php-lint/internal/config"
 	"github.com/codevault-llc/php-lint/internal/lexer"
 	"github.com/codevault-llc/php-lint/internal/parser"
@@ -23,13 +20,13 @@ type Linter struct {
 	config config.Config
 	logger zerolog.Logger
 	rules  []rules.Rule
-	symbolTable *stubs.SymbolTable
 }
 
 func New(configPath string, logger zerolog.Logger) (*Linter, error) {
 	cfg := config.New()
 	if cfg == nil {
-		return nil, fmt.Errorf("could not load configuration")
+		logger.Fatal().Msg("Failed to create default config")
+		cfg.Defaults()
 	}
 
 	// Parse stubs
@@ -74,53 +71,39 @@ func New(configPath string, logger zerolog.Logger) (*Linter, error) {
 	logger.Info().Int("count", len(activeRules)).Msg("Active rules loaded")
 
 	return &Linter{
-		config:      *cfg,
-		logger:      logger,
-		rules:       activeRules,
-		symbolTable: symbolTable,
+		config: *cfg,
+		logger: logger,
+		rules:  activeRules,
 	}, nil
 }
 
-func (l *Linter) LintProject(files map[string][]byte) map[string][]types.Issue {
-	parsedFiles := make(map[string]*ast.Program)
+func (l *Linter) LintFile(path string, content []byte, symbolTable *stubs.SymbolTable) []types.Issue {
+	lxr := lexer.New(string(content))
+	psr := parser.New(lxr)
+	program := psr.ParseProgram()
 
-	// Create and populate the AST for each file
-	for filename, content := range files {
-		lxr := lexer.New(string(content))
-		psr := parser.New(lxr)
-		program := psr.ParseProgram()
+	var allIssues []types.Issue
 
-		// Add locally defined functions
-		l.symbolTable.AddSymbolsFromAST(program)
-		parsedFiles[filename] = program
-	}
-	l.logger.Info().Int("functions", l.symbolTable.FunctionCount()).Msg("Symbol collection complete")
-
-	results := make(map[string][]types.Issue)
-
-	for filename, content := range files {
-		program := parsedFiles[filename]
-		var allIssues []types.Issue
-
-		if enabled, ok := l.config.Rules["require-tags"]; ok && enabled {
-			if !strings.HasPrefix(string(content), "<?php") {
-				allIssues = append(allIssues, types.Issue{
-					RuleName: "require-tags",
-					Message:  "File must contain both '<?php' and '?>' tags.",
-				})
-
-				//return allIssues
-			}
-		}
-		
-		for _, rule := range l.rules {
-			issues := rule.Check(filename, content, program, l.symbolTable)
-			allIssues = append(allIssues, issues...)
-		}
-		results[filename] = allIssues
+	for _, rule := range l.rules {
+		issues := rule.Check(path, content, program, symbolTable)
+		allIssues = append(allIssues, issues...)
 	}
 
-	return results
+	return allIssues
+}
+
+func (l *Linter) LintFiles(paths []string, symbolTable *stubs.SymbolTable) []types.Issue {
+	var allIssues []types.Issue
+	for _, path := range paths {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			l.logger.Error().Err(err).Str("path", path).Msg("Failed to read file")
+			continue
+		}
+		issues := l.LintFile(path, content, symbolTable)
+		allIssues = append(allIssues, issues...)
+	}
+	return allIssues
 }
 
 func (l *Linter) Config() *config.Config {

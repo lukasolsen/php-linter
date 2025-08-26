@@ -1,7 +1,6 @@
 package lexer
 
 import (
-	"fmt"
 	"strings"
 	"unicode"
 
@@ -38,102 +37,22 @@ func (l *Lexer) readChar() {
 	}
 }
 
-// peekChar looks ahead in the input without consuming the character.
-func (l *Lexer) peekChar() rune {
-	if l.readPosition >= len(l.input) {
-		return 0
-	}
-	return rune(l.input[l.readPosition])
-}
-
-func (l *Lexer) NextToken() token.Token {
-	l.skipWhitespace()
-
-	var tok token.Token
-
-	switch l.ch {
-	case '<':
-		if l.peekChar() == '?' {
-			// Check for '<?php'
-			if len(l.input) > l.position+4 && l.input[l.position:l.position+5] == "<?php" {
-				// Consume '<?php'
-				l.readChar() // ?
-				l.readChar() // p
-				l.readChar() // h
-				l.readChar() // p
-				tok = l.newToken(token.OPEN_TAG, "<?php")
-			}
-		}
-	case '?':
-		if l.peekChar() == '>' {
-			l.readChar()
-			tok = l.newToken(token.CLOSE_TAG, "?>")
-		}
-	case '(':
-		tok = l.newToken(token.LPAREN, "(")
-	case ')':
-		tok = l.newToken(token.RPAREN, ")")
-	case '{':
-		tok = l.newToken(token.LBRACE, "{")
-	case ',':
-		tok = l.newToken(token.COMMA, ",")
-	case '"':
-		tok = l.newToken(token.STRING, l.readString())
-	case '}':
-		tok = l.newToken(token.RBRACE, "}")
-	case '/':
-		if l.peekChar() == '*' {
-			l.readChar()
-			tok = l.newToken(token.BLOCK_COMMENT, l.readBlockComment())
-		} else if l.peekChar() == '/' {
-			l.readChar()
-			tok = l.newToken(token.LINE_COMMENT, l.readLineComment())
-		}
-	case ';':
-		tok = l.newToken(token.SEMICOLON, ";")
-	case '\'':
-		tok.Kind = token.STRING
-		tok.Lexeme = l.readString()
-	case 0:
-		tok.Lexeme = ""
-		tok.Kind = token.EOF
-	default:
-		if isLetter(l.ch) {
-			tok.Lexeme = l.readIdentifier()
-			tok.Kind = token.LookupIdent(tok.Lexeme)
-			return tok
-		} else {
-			fmt.Println("Illegal character listed !!", string(l.ch))
-			tok = l.newToken(token.ILLEGAL, string(l.ch))
-		}
-	}
-
-	l.readChar()
-	return tok
-}
-
 func (l *Lexer) readString() string {
-	var sb strings.Builder
-	l.readChar() // Consume opening '
+	// Consumes the opening '
+	l.readChar()
+	start := l.position
 	for l.ch != '\'' && l.ch != 0 {
-		sb.WriteRune(l.ch)
 		l.readChar()
 	}
-	return sb.String()
+	end := l.position
+	l.readChar() // Consumes the closing '
+	return l.input[start:end]
 }
 
 func (l *Lexer) skipWhitespace() {
 	for unicode.IsSpace(l.ch) {
 		l.readChar()
 	}
-}
-
-func (l *Lexer) readIdentifier() string {
-	pos := l.position
-	for isLetter(l.ch) || isDigit(l.ch) {
-		l.readChar()
-	}
-	return l.input[pos:l.position]
 }
 
 func isLetter(ch rune) bool {
@@ -144,9 +63,26 @@ func isDigit(ch rune) bool {
 	return unicode.IsDigit(ch)
 }
 
-func (l *Lexer) newToken(kind token.Kind, lexeme string) token.Token {
-	// Note: Span calculation can be improved for multi-char tokens
-	return token.Token{Kind: kind, Lexeme: lexeme}
+// newTokenFromPos is a helper to build a token from a starting position.
+// The end position is inferred from the lexer's current state.
+func (l *Lexer) newTokenFromPos(kind token.Kind, lexeme string, start token.Pos) token.Token {
+	return token.Token{
+		Kind:   kind,
+		Lexeme: lexeme,
+		Span: token.Span{
+			Start: start,
+			End:   token.Pos{Line: l.line, Col: l.column, Offset: l.position},
+		},
+	}
+}
+
+func (l *Lexer) readIdentifier() string {
+	start := l.position
+	for isLetter(l.ch) || isDigit(l.ch) {
+		l.readChar()
+	}
+
+	return l.input[start:l.position]
 }
 
 func (l *Lexer) readBlockComment() string {

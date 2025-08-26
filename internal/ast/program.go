@@ -6,6 +6,7 @@ import (
 
 // Program is the root node for a PHP file.
 type Program struct {
+    Base
     Stmts []Stmt
 }
 

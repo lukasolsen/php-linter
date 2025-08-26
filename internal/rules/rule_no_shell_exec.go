@@ -16,16 +16,25 @@ func (r *RuleNoShellExec) Description() string { return "Disallows the use of sh
 func (r *RuleNoShellExec) Check(filename string, content []byte, program *ast.Program, symbolTable *stubs.SymbolTable) []types.Issue {
 	visitor := &callExprVisitor{
 		ruleName: r.Name(),
-		check: func(node *ast.CallExpr) (bool, string) {
+		check: func(node *ast.CallExpr) (*types.Issue, bool) {
 			dangerousFunctions := map[token.Kind]bool{
 				token.SHELL_EXEC: true, token.EXEC: true, token.PASSTHRU: true, token.SYSTEM: true,
 			}
 			if ident, ok := node.Function.(*ast.Identifier); ok {
 				if _, found := dangerousFunctions[ident.Token.Kind]; found {
-					return true, "Execution of shell commands is a security risk"
+					issue := &types.Issue{
+						RuleName: r.Name(),
+						Message:  "Execution of shell commands is a security risk",
+						Range:    ident.Token.Span,
+						Severity: 2,
+						Source:   "php-lint",
+					}
+
+					return issue, true
 				}
 			}
-			return false, ""
+
+			return nil, false
 		},
 	}
 	ast.Walk(program, visitor)

@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/codevault-llc/php-lint/internal/ast"
 	"github.com/codevault-llc/php-lint/internal/stubs"
@@ -15,24 +16,28 @@ func (r *RuleUndefinedFunction) Description() string {
 	return "Reports calls to functions that are not defined."
 }
 
-// This rule's Check method now accepts the symbol table from the linter.
-func (r *RuleUndefinedFunction) Check(
-	filename string,
-	content []byte,
-	program *ast.Program,
-	symbolTable *stubs.SymbolTable, // <-- Receives the complete table
-) []types.Issue {
+func (r *RuleUndefinedFunction) Check(filename string, content []byte, program *ast.Program, symbolTable *stubs.SymbolTable) []types.Issue {
 	visitor := &callExprVisitor{
 		issues:   []types.Issue{},
 		ruleName: r.Name(),
-		check: func(node *ast.CallExpr) (bool, string) {
+		check: func(node *ast.CallExpr) (*types.Issue, bool) {
 			if ident, ok := node.Function.(*ast.Identifier); ok {
-				// The core logic: check if the function exists in the now-complete table.
 				if !symbolTable.IsFunctionDefined(ident.Value) {
-					return true, fmt.Sprintf("Call to undefined function %s()", ident.Value)
+					log.Printf("Undefined function %s() called", ident.Token)
+
+					issue := types.Issue{
+						RuleName: r.Name(),
+						Message:  fmt.Sprintf("Call to undefined function %s()", ident.Value),
+						Range:    ident.Token.Span,
+						Severity: 2,
+						Source:   "php-lint",
+					}
+
+					return &issue, true
 				}
 			}
-			return false, ""
+
+			return nil, false
 		},
 	}
 	ast.Walk(program, visitor)

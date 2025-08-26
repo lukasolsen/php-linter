@@ -4,13 +4,17 @@ import "fmt"
 
 // Span represents a region of source code.
 type Span struct {
-	Start, End Pos
+	Start Pos
+	End   Pos
 }
 
 // Pos represents a position in a file.
 type Pos struct {
-	Line, Col, Offset int
+	Line   int // 1-based line number
+	Col    int // 1-based column number
+	Offset int // 0-based byte offset
 }
+
 
 // Kind is the type of a token.
 type Kind string
@@ -59,7 +63,7 @@ const (
 type Token struct {
 	Kind   Kind
 	Lexeme string
-	Span   Span
+	Span   Span 
 }
 
 func (t Token) String() string {

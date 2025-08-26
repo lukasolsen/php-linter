@@ -6,21 +6,27 @@ import (
 	"path/filepath"
 
 	"github.com/codevault-llc/php-lint/internal/linter"
-	"github.com/codevault-llc/php-lint/internal/reporter"
+	"github.com/codevault-llc/php-lint/internal/stubs"
+	"github.com/codevault-llc/php-lint/internal/workspace"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
+var linterInstance *linter.Linter
+var workspaceInstance *workspace.Workspace
+var logger zerolog.Logger
+
 func main() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 
-	l, err := linter.New("config.json", log.Logger)
+	var err error
+	linterInstance, err = linter.New("config.json", logger)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize linter")
+		logger.Fatal().Err(err).Msg("Failed to create linter")
 	}
 
-	paths := l.Config().Paths
+	paths := linterInstance.Config().Paths
 	if len(os.Args) > 1 {
 		if os.Args[1] == "--help" || os.Args[1] == "-h" {
 			fmt.Println("Usage: php-lint [options] [paths...]")
@@ -31,30 +37,27 @@ func main() {
 
 		paths = os.Args[1:]
 	}
-	log.Debug().Strs("paths", paths).Msg("Determined target paths")
+	logger.Debug().Strs("paths", paths).Msg("Determined target paths")
 
-	filesToLint := make(map[string][]byte)
-	for _, path := range paths {
-		err := filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if !info.IsDir() && filepath.Ext(p) == ".php" {
-				content, readErr := os.ReadFile(p)
-				if readErr != nil {
-					log.Error().Err(readErr).Str("file", p).Msg("Failed to read file")
-					return nil
-				}
-				filesToLint[p] = content
-			}
-			return nil
-		})
-		if err != nil {
-			log.Error().Err(err).Str("path", path).Msg("Failed to walk path")
-		}
+	absPath, err := filepath.Abs(paths[0])
+	if err != nil {
+		logger.Error().Err(err).Str("path", paths[0]).Msg("Failed to get absolute path")
+		return
 	}
 
-	results := l.LintProject(filesToLint)
+	logger.Info().Str("path", absPath).Msg("Starting linting for path")
 
-	reporter.Render(results)
+	// Workspace -- Init
+	stubsTable := stubs.NewSymbolTable()
+	workspaceInstance = workspace.New(absPath, stubsTable, logger)
+	workspaceInstance.Build()
+
+	// Run linter
+	phpFiles := workspaceInstance.GetPHPFiles()
+
+	logger.Info().Int("files", len(phpFiles)).Msg("Starting linting process")
+
+	linterInstance.LintFiles(phpFiles, workspaceInstance.GetSymbolTable())
+
+	//reporter.Render(results)
 }

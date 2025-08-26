@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"log"
+
 	"github.com/codevault-llc/php-lint/internal/ast"
 	"github.com/codevault-llc/php-lint/internal/lexer"
 	"github.com/codevault-llc/php-lint/internal/token"
@@ -50,18 +52,9 @@ func (p *Parser) registerInfix(kind token.Kind, fn infixParseFn) {
 	p.infixParseFns[kind] = fn
 }
 
-
 func (p *Parser) nextToken() {
 	p.curTok = p.peekTok
 	p.peekTok = p.l.NextToken()
-}
-
-func (p *Parser) expectPeek(t token.Kind) bool {
-	if p.peekTok.Kind == t {
-		p.nextToken()
-		return true
-	}
-	return false
 }
 
 func (p *Parser) ParseProgram() *ast.Program {
@@ -101,7 +94,11 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	stmt := &ast.ExpressionStatement{Token: p.curTok}
 	stmt.Expression = p.parseExpression()
 
+	log.Print("Parsed expression:", stmt.Expression)
+
 	if p.peekTok.Kind == token.SEMICOLON {
+		log.Print("Found semicolon:", p.peekTok)
+
 		p.nextToken()
 	}
 	return stmt
@@ -128,12 +125,23 @@ func (p *Parser) parseExpression() ast.Expr {
 }
 
 func (p *Parser) parseIdentifier() ast.Expr {
-	return &ast.Identifier{Token: p.curTok, Value: p.curTok.Lexeme}
+	return &ast.Identifier{
+		Base:  ast.Base{S: p.curTok.Span.Start, E: p.curTok.Span.End},
+		Token: p.curTok,
+		Value: p.curTok.Lexeme,
+	}
 }
 
 func (p *Parser) parseCallExpression(function ast.Expr) ast.Expr {
-	expr := &ast.CallExpr{Token: p.curTok, Function: function}
+	expr := &ast.CallExpr{
+		Base:     ast.Base{S: function.Pos()},
+		Token:    p.curTok,
+		Function: function,
+	}
+
 	expr.Arguments = p.parseCallArguments()
+	expr.E = p.curTok.Span.End
+
 	return expr
 }
 

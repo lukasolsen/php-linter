@@ -9,6 +9,7 @@ import (
 
 // EchoStmt represents an 'echo' statement, e.g., echo "Hello", "World";
 type EchoStmt struct {
+    Base
     Token       token.Token // The 'echo' token
     Expressions []Expr
 }
@@ -28,6 +29,7 @@ func (es *EchoStmt) String() string {
 
 // ExpressionStatement holds an expression.
 type ExpressionStatement struct {
+    Base
     Token      token.Token // The first token of the expression
     Expression Expr
 }
@@ -42,6 +44,7 @@ func (es *ExpressionStatement) String() string {
 
 // FunctionDeclStmt represents a 'function' statement, e.g., function my_func($a) {}.
 type FunctionDeclStmt struct {
+    Base
     Token token.Token // The 'function' token
     Name  *Identifier
 }

@@ -8,21 +8,10 @@ import (
 )
 
 // Render formats and prints the final linting report to the console.
-func Render(results map[string][]types.Issue) {
-	totalIssues := 0
-	filesWithIssues := 0
-
-	// Pre-calculate stats
-	for _, issues := range results {
-		if len(issues) > 0 {
-			filesWithIssues++
-			totalIssues += len(issues)
-		}
-	}
-
-	if totalIssues == 0 {
-		color.New(color.FgGreen).Println("\n✅ No issues found. Your code is looking great!")
-		return
+func Render(issues []types.Issue) {
+	groupedIssues := make(map[string][]types.Issue)
+	for _, issue := range issues {
+		groupedIssues[issue.Source] = append(groupedIssues[issue.Source], issue)
 	}
 
 	// Create color functions
@@ -33,15 +22,16 @@ func Render(results map[string][]types.Issue) {
 
 	fmt.Println() // Add a newline for spacing
 
-	for file, issues := range results {
-		if len(issues) == 0 {
+	for _, issueList := range groupedIssues {
+		if len(issueList) == 0 {
 			continue
 		}
 
-		filePathColor.Println(file)
-		for _, issue := range issues {
-			// In a real implementation, you'd populate the issue's Line and Col
-			// from the AST node's position. For now, we'll omit them.
+		for _, issue := range issueList {
+			filePathColor.Println(issue.Source)
+			for _, issue := range issueList {
+				// In a real implementation, you'd populate the issue's Line and Col
+				// from the AST node's position. For now, we'll omit them.
 			warningColor.Printf("  %s ", "warning")
 			fmt.Printf(" %s ", issue.Message)
 			ruleColor.Printf(" (%s)\n", issue.RuleName)
@@ -49,6 +39,7 @@ func Render(results map[string][]types.Issue) {
 		fmt.Println()
 	}
 
-	summary := fmt.Sprintf("\n✖ %d problem(s) found in %d file(s).", totalIssues, filesWithIssues)
+	summary := fmt.Sprintf("\n✖ %d problem(s) found in %d file(s).", len(groupedIssues), len(issues))
 	errorColor.Println(summary)
+}
 }

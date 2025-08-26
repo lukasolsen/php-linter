@@ -2,7 +2,11 @@ package main
 
 import (
 	"log"
+	"net/url"
 
+	"github.com/codevault-llc/php-lint/internal/linter"
+	"github.com/codevault-llc/php-lint/internal/stubs"
+	"github.com/codevault-llc/php-lint/internal/workspace"
 	"github.com/tliron/commonlog"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -14,41 +18,48 @@ const lsName = "php-linter"
 
 var version string = "0.0.1"
 var handler protocol.Handler
+
+var linterInstance *linter.Linter
+var workspaceInstance *workspace.Workspace
+var serverLogger commonlog.Logger
+
 func main() {
-	log.Println("PHP Linter LSP is starting...")
-
-	/*l, err := linter.New("config.json", log.Logger)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize linter")
-	}*/
-
 	commonlog.Configure(1, nil)
+	serverLogger = commonlog.GetLogger("php-linter")
 
-	log.Println("PHP Linter LSP is starting... handler finished")
-
-	handler = protocol.Handler{
-		Initialize:  onInitialize,
-		Initialized: onInitialized,
-		Shutdown:    onShutdown,
-		TextDocumentDidOpen:  onDidOpen,
-		TextDocumentDidChange: onDidChange,
-		SetTrace: setTrace,
+	var err error
+	linterInstance, err = linter.New("config.json", serverLogger)
+	if err != nil {
+		serverLogger.Criticalf("Failed to create linter: %v", err)
 	}
 
-	log.Println("PHP Linter LSP is starting... server initialized")
+	handler = protocol.Handler{
+		Initialize:          onInitialize,
+		Initialized:         onInitialized,
+		Shutdown:            onShutdown,
+		TextDocumentDidOpen: onDidOpen,
+		TextDocumentDidChange: onDidChange,
+		SetTrace:            setTrace,
+	}
 
 	server := server.NewServer(&handler, lsName, false)
-
-	log.Println("PHP Linter LSP is starting... before run stdio")
-
 	server.RunStdio()
-
-	log.Println("Running LSP server on stdio...")
-
-	//results := l.LintProject(filesToLint)
 }
 
 func onInitialize(context *glsp.Context, params *protocol.InitializeParams) (any, error) {
+	if params.RootURI != nil {
+		uri, err := url.Parse(*params.RootURI)
+		if err == nil {
+			stubsTable := stubs.NewSymbolTable()
+			// You would parse configured stubs here and pass them to the workspace
+			// stubsTable.AddFromPath("/path/to/wordpress-stubs")
+
+			workspaceInstance = workspace.New(uri.Path, stubsTable, serverLogger)
+			
+			go workspaceInstance.Build()
+		}
+	}
+
 	capabilities := handler.CreateServerCapabilities()
 	capabilities.TextDocumentSync = &protocol.TextDocumentSyncOptions{
 		OpenClose: &protocol.True,
@@ -78,46 +89,59 @@ func onShutdown(ctx *glsp.Context) error {
 }
 
 func onDidOpen(ctx *glsp.Context, params *protocol.DidOpenTextDocumentParams) error {
-	log.Println("Document opened, linting...")
-
-	return lintDocument(ctx, params.TextDocument.URI, params.TextDocument.Text)
+	return lintDocument(ctx, params.TextDocument.URI, []byte(params.TextDocument.Text))
 }
 
 func onDidChange(ctx *glsp.Context, params *protocol.DidChangeTextDocumentParams) error {
 	log.Println("Document changed, re-linting...")
 
-	// turn it into a string
 	text := ""
 	for _, change := range params.ContentChanges {
 		if whole, ok := change.(protocol.TextDocumentContentChangeEventWhole); ok {
 			text += whole.Text
 		}
 	}
-	
-	return lintDocument(ctx, params.TextDocument.URI, text)
+
+	return lintDocument(ctx, params.TextDocument.URI, []byte(text))
 }
 
-func lintDocument(ctx *glsp.Context, uri string, text string) error {
-	var diagnostics []protocol.Diagnostic
+func lintDocument(ctx *glsp.Context, uri string, text []byte) error {
+	if workspaceInstance == nil {
+		serverLogger.Warning("Workspace not initialized, cannot lint.")
+		return nil
+	}
+	
+	path, err := url.Parse(uri)
+	if err != nil {
+		return nil
+	}
 
+	// 1. Update the workspace with the latest file content from the editor
+	workspaceInstance.UpdateFile(path.Path, text)
 
-	lines := splitLines(text)
-	log.Println("Linting document:", uri, len(lines), "lines")
+	// 2. Lint the file using the complete, up-to-date symbol table from the workspace
+	issues := linterInstance.LintFile(path.Path, text, workspaceInstance.GetSymbolTable())
 
-	for i, line := range lines {
-        if len(line) > 80 {
-            sev := protocol.DiagnosticSeverityWarning
-            diagnostics = append(diagnostics, protocol.Diagnostic{
-                Range: protocol.Range{
-                    Start: protocol.Position{Line: uint32(i), Character: 80},
-                    End:   protocol.Position{Line: uint32(i), Character: uint32(len(line))},
-                },
-                Severity: &sev,
-                Message:  "Line exceeds 80 characters",
-            })
-        }
-    }
+	diagnostics := []protocol.Diagnostic{}
+	for _, issue := range issues {
+		positionLine := protocol.UInteger(issue.Pos.Line - 1)
+		positionColumn := protocol.UInteger(issue.Pos.Col - 1)
 
+		diagnostics = append(diagnostics, protocol.Diagnostic{
+			Range: protocol.Range{
+				Start: protocol.Position{Line: positionLine, Character: positionColumn},
+				End:   protocol.Position{Line: positionLine, Character: positionColumn},
+			},
+			Severity:  issue.Severity,
+			Message:   issue.Message,
+			Source:    issue.Source,
+			CodeDescription: &protocol.CodeDescription{
+				HRef: "https://example.com/rules/line-length",
+			},
+			RelatedInformation: nil,
+			Data:               nil,
+		})
+	}
 	ctx.Notify(protocol.ServerTextDocumentPublishDiagnostics, protocol.PublishDiagnosticsParams{
 		URI:         uri,
 		Diagnostics: diagnostics,

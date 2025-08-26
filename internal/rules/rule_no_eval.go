@@ -17,11 +17,20 @@ func (r *RuleNoEval) Check(filename string, content []byte, program *ast.Program
 	visitor := &callExprVisitor{
 		issues:   []types.Issue{},
 		ruleName: r.Name(),
-		check: func(node *ast.CallExpr) (bool, string) {
+		check: func(node *ast.CallExpr) (*types.Issue, bool) {
 			if ident, ok := node.Function.(*ast.Identifier); ok && ident.Token.Kind == token.EVAL {
-				return true, "Use of eval() is a significant security risk and is strongly discouraged"
+				issue := &types.Issue{
+					RuleName: r.Name(),
+					Message:  "Use of eval() is a significant security risk and is strongly discouraged",
+					Range:    ident.Token.Span,
+					Severity: 2,
+					Source:   "php-lint",
+				}
+
+				return issue, true
 			}
-			return false, ""
+
+			return nil, false
 		},
 	}
 	ast.Walk(program, visitor)

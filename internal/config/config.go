@@ -37,6 +37,23 @@ func New() *Config {
 	}
 }
 
+func (cfg *Config) Defaults() {
+	if cfg.PHPVersion == "" {
+		cfg.PHPVersion = "8.0"
+	}
+	if cfg.Rules == nil {
+		cfg.Rules = map[string]bool{
+			"no_unused_variables": true,
+			"no_undefined_functions": true,
+			"no_undefined_classes": true,
+			"no_syntax_errors": true,
+		}
+	}
+	if len(cfg.Stubs) == 0 {
+		cfg.Stubs = []string{"stubs/"}
+	}
+}
+
 func (cfg *Config) Validate() error {
 	if cfg.Extends == "" {
 		return fmt.Errorf("extends field is required")
